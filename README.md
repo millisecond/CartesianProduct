@@ -19,7 +19,7 @@ Install Java, Maven, and set environment in normal ways.
  
 ```mvn package``` will compile the project and then you can run arbitrary input with 
  
-```java -cp target/cartesianproduct-1.0-SNAPSHOT.jar com.haakenson.cartesian.product.Main a{b,c}d{e,f,g}hi```
+```java -cp target/cartesianproduct-1.0-SNAPSHOT.jar com.haakenson.cartesian.product.Main "a{b,c}d{e,f,g}hi"```
 
 ## DEPDENCIES
 

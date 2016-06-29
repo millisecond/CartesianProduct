@@ -6,6 +6,8 @@ import com.haakenson.cartesian.product.blocks.ConstantBlock;
 import java.util.List;
 
 /**
+ * Wrap the core functionality in nice and clean static methods callable by the rest of the code.
+ *
  * User: millisecond
  * Date: 6/28/16
  * Time: 10:30 AM
@@ -34,7 +36,7 @@ public class CartesianProduct {
         return String.join(" ", BlockParser.calculateProduct(in));
     }
 
-    private static void validateInput(String in) {
+    public static void validateInput(String in) {
         if (in == null) {
             throw new IllegalArgumentException("Null input not allowed");
         }

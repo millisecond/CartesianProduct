@@ -1,5 +1,7 @@
 package com.haakenson.cartesian.product.blocks;
 
+import com.haakenson.cartesian.product.CartesianProduct;
+
 import java.util.*;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
@@ -32,11 +34,13 @@ public class BlockParser {
      * @return all the products / products produces by the input string
      */
     public static List<String> calculateProduct(String raw) {
+        CartesianProduct.validateInput(raw);
         BlockParser parser = new BlockParser(raw);
         return parser.parse().products(new ArrayList<>());
     }
 
     public BlockParser(String raw) {
+        CartesianProduct.validateInput(raw);
         this.raw = raw;
     }
 
@@ -100,6 +104,7 @@ public class BlockParser {
                             } else {
                                 currentVariant.variants.add(sub.parse());
                             }
+                            //reset our outer state and keep processing from the end of the sub-segment
                             current = new StringBuilder();
                             i = j;
                             break;
@@ -109,13 +114,18 @@ public class BlockParser {
                 }
             }  else if (c == VARIANT_SEPARTOR) {
                 if (current.length() > 0) {
+                    if (currentVariant == null) {
+                        throw new IllegalStateException("Encountered a variant separator without a corresponding open segment: " + current);
+                    }
                     currentVariant.variants.add(new ConstantBlock(current.toString()));
                     current = new StringBuilder();
                 }
             }  else if (c == CLOSE) {
-                //create a new block
                 if (current.length() > 0) {
                     LOGGER.fine("Reached close block with content: " + current);
+                    if (currentVariant == null) {
+                        throw new IllegalStateException("Encountered a close block without a corresponding open block this current context: " + current);
+                    }
                     currentVariant.variants.add(new ConstantBlock(current.toString()));
                 }
                 currentVariant = null;
@@ -162,8 +172,7 @@ public class BlockParser {
         handler.setLevel(Level.FINER);
         LOGGER.addHandler(handler);
 
-//        BlockParser parser = new BlockParser("{b,{a,d,c}}a");
-        BlockParser parser = new BlockParser("a{b,c{d,e,f}g,h}ij{k,l}");
+        BlockParser parser = new BlockParser("{b,{a,d,c}}a");
         BlockList blocks = parser.parse();
 
         for (Block block : blocks.getBlocks()) {
