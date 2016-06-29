@@ -52,8 +52,8 @@ public class TestCartesianProducts {
 
     @Test
     public void testNested() throws Exception {
+        assertCollectionContainsAll("ba aa da ca".split(" "), CartesianProduct.products("{b,{a,d,c}}a"));
         assertCollectionContainsAll("abijk abijl acdgijk acdgijl acegijk acegijl acfgijk acfgijl ahijk ahijl".split(" "), CartesianProduct.products("a{b,c{d,e,f}g,h}ij{k,l}"));
-        assertCollectionContainsAll("ba aa ba ca".split(" "), CartesianProduct.products("{b,{a,b,c}}a"));
     }
 
     /**
