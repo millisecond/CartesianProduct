@@ -31,7 +31,7 @@ public class CartesianProduct {
      */
     public static String product(String in) {
         validateInput(in);
-        return String.join(" ", products(in));
+        return String.join(" ", BlockParser.calculateProduct(in));
     }
 
     private static void validateInput(String in) {

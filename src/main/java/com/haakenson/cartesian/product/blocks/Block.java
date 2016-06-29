@@ -9,6 +9,11 @@ import java.util.List;
  */
 public interface Block {
 
-    public List<String> variants();
+    /**
+     * Combine the strings produced by this block with the base strings.
+     * @param base all products seen so far.
+     * @return the combined products
+     */
+    List<String> products(List<String> base);
 
 }

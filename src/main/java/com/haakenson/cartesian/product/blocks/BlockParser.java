@@ -1,6 +1,10 @@
 package com.haakenson.cartesian.product.blocks;
 
 import java.util.*;
+import java.util.logging.ConsoleHandler;
+import java.util.logging.Level;
+import java.util.logging.LogManager;
+import java.util.logging.Logger;
 
 /**
  * User: millisecond
@@ -9,80 +13,110 @@ import java.util.*;
  */
 public class BlockParser {
 
+    private final static Logger LOGGER = Logger.getLogger(BlockParser.class.getName());
+
     //a recursive structure of string blocks.
     //a block can either be plain text or "variant" which will expand based on the product
 
     public static final char OPEN = '{';
     public static final char CLOSE = '}';
-    public static final String VARIANT_SEPARTOR = ",";
+    public static final char VARIANT_SEPARTOR = ',';
 
+    BlockList blocks = new BlockList();
+
+    String raw;
+
+    /**
+     * Utility function that wraps instance methods in single call.
+     * @param raw a string containing echo-style cartesian-product notation
+     * @return all the products / products produces by the input string
+     */
     public static List<String> calculateProduct(String raw) {
-        return product(parse(raw));
+        BlockParser parser = new BlockParser(raw);
+        return parser.parse().products(new ArrayList<>());
     }
 
-    private static List<Block> parse(String raw) {
-        System.out.println("Processing: " + raw);
+    public BlockParser(String raw) {
+        this.raw = raw;
+    }
+
+    /**
+     * Do the heavy lifting of parsing the string.
+     * @return
+     */
+    private BlockList parse() {
+        LOGGER.fine("Processing: " + raw);
         char[] contents = raw.toCharArray();
         boolean inBlock = false;
         StringBuilder current = new StringBuilder();
 
-        List<Block> blocks = new ArrayList<>();
+        VariantBlock currentVariant = null;
 
         for (int i = 0; i < contents.length; i++) {
             char c = contents[i];
-
             if (inBlock && c == OPEN) {
-                //we're opening a sub-expression
-                //look-ahead to the next close and create
-                System.out.println("Opening a sub-expression with: " + current);
+                //we're opening a sub-expression+
 
+                //look-ahead to our close and sub-process
                 StringBuilder inner = new StringBuilder();
+                inner.append(c);
+                //if we're not the first open, go into a sub-parser
+                int currentlyOpen = 1;//the one we just saw is one-open
+
                 for (int j = i + 1; j < contents.length; j++) {
                     char lookAhead = contents[j];
                     if (lookAhead == CLOSE) {
-                        System.out.println("Sub-parsing: " + inner.toString());
-                        blocks.addAll(parse(OPEN + inner.toString() + CLOSE));
-                        i = j;
-                        break;
+                        currentlyOpen--;
+                        LOGGER.fine("Saw close with inner: " + inner + " count: " + currentlyOpen);
+
+                    } else if (lookAhead == OPEN) {
+                        currentlyOpen++;
+                        LOGGER.fine("Saw open with inner: " + inner);
+                    }
+                    if (currentlyOpen == 0) {
+                        if (currentVariant == null || lookAhead == VARIANT_SEPARTOR) {
+                            LOGGER.fine("Entire sub-segment: " + inner);
+                            BlockParser sub = new BlockParser(current.toString() + inner.toString());
+                            if (currentVariant == null) {
+                                blocks.add(sub.parse());
+                            } else {
+                                currentVariant.variants.add(sub.parse());
+                            }
+                            current = new StringBuilder();
+                            i = j;
+                            break;
+                        }
                     }
                     inner.append(lookAhead);
                 }
-            } else if (inBlock && c == CLOSE) {
+            }  else if (inBlock && c == VARIANT_SEPARTOR) {
+                if (current.length() > 0) {
+                    currentVariant.variants.add(new ConstantBlock(current.toString()));
+                    current = new StringBuilder();
+                }
+            }  else if (inBlock && c == CLOSE) {
                 //create a new block
                 if (current.length() > 0) {
-                    System.out.println("Reached close block with content: " + current);
-
-                    String[] split = current.toString().split(VARIANT_SEPARTOR);
-                    if (split.length > 1) {
-                        boolean hasSpaces = false;
-                        for (String s : split) {
-                            if (s.contains(" ")) {
-                                hasSpaces = true;
-                                break;
-                            }
-                        }
-                        if (hasSpaces) {
-                            //special case: echo {a, b} prints as {a, b}
-                            blocks.add(new ConstantBlock(OPEN + current.toString() + CLOSE));
-                        } else {
-//                            blocks.add(new VariantBlock(Arrays.asList(split)));
-                        }
-                    } else {
-                        //special case: echo {a} prints as {a}
-                        blocks.add(new ConstantBlock(OPEN + current.toString() + CLOSE));
-                    }
+                    LOGGER.fine("Reached close block with content: " + current);
+                    currentVariant.variants.add(new ConstantBlock(current.toString()));
                 } else {
                     //special case: an empty block is printed as {} by echo, let's do the same
                     blocks.add(new ConstantBlock(String.valueOf(OPEN) + String.valueOf(CLOSE)));
                 }
+                currentVariant = null;
                 current = new StringBuilder();
                 inBlock = false;
             } else if (!inBlock && c == OPEN) {
                 inBlock = true;
+
+                currentVariant = new VariantBlock();
+
                 if (current.length() > 0) {
-                    System.out.println("Reached open block with content: " + current);
+                    LOGGER.fine("Reached open block with content: " + current);
                     blocks.add(new ConstantBlock(current.toString()));
                 }
+
+                blocks.add(currentVariant);
                 current = new StringBuilder();
             } else {
                 current.append(c);
@@ -90,7 +124,7 @@ public class BlockParser {
         }
 
         if (current.length() > 0) {
-            System.out.println("Ended with content: " + current);
+            LOGGER.fine("Ended with content: " + current);
             String s = current.toString();
             if (inBlock) {
                 s = OPEN + s;
@@ -101,25 +135,21 @@ public class BlockParser {
         return blocks;
     }
 
-    //package access so variants can also call this
-    static List<String> product(List<Block> blocks) {
-        return product(0, blocks);
-    }
-
-    private static List<String> product(int index, List<Block> blocks) {
+    /**
+     * Utility function used by blocks to expand their products.
+     * @param base all strings seen so far
+     * @param expand new strings seen at this level
+     * @return the product of the two lists
+     */
+    public static List<String> product(List<String> base, List<String> expand) {
         List<String> expanded = new ArrayList<>();
-        for (Block block : blocks) {
-            List<String> variants = block.variants();
-            if (expanded.size() == 0) {
-                expanded.addAll(variants);
-            } else {
-                List<String> nextStep = new ArrayList<>();
-                for (String variant : variants) {
-                    for (String orig : expanded) {
-                        nextStep.add(orig + variant);
-                    }
+        if (base.size() == 0) {
+            expanded.addAll(expand);
+        } else {
+            for (String b : base) {
+                for (String e : expand) {
+                    expanded.add(b + e);
                 }
-                expanded = nextStep;
             }
         }
         return expanded;
@@ -128,16 +158,20 @@ public class BlockParser {
     public static void main(String[] args) {
         //A small main method so I can iterate faster than running the whole test suite
 
-//        List<Block> blocks = parse("{a}");
-//        List<Block> blocks = parse("{a, b");
-        List<Block> blocks = parse("{car,{dump,pickup},plane}s");
-//        List<Block> blocks = parse("{car,{dump,pickup}truck,plane}s");
-//        List<Block> blocks = parse("{car,{dump,pick{up, down}}truck,plane}s");
-        for (Block block : blocks) {
-            System.out.println(block.getClass().getSimpleName() + " = " + String.join(" | ", block.variants()));
+        LOGGER.setLevel(Level.FINER);
+        ConsoleHandler handler = new ConsoleHandler();
+        handler.setLevel(Level.FINER);
+        LOGGER.addHandler(handler);
+
+        BlockParser parser = new BlockParser("{b,{a,b,c}}a");
+        BlockList blocks = parser.parse();
+
+        for (Block block : blocks.getBlocks()) {
+            System.out.println(block.getClass().getSimpleName() + " = " + block.toString());
         }
 
         System.out.println("\nProduct: ");
-        System.out.println(String.join("-", product(blocks)));
+        System.out.println(String.join(" - ", blocks.products(new ArrayList<>())));
     }
+
 }
