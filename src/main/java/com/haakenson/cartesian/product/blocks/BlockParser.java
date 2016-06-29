@@ -61,7 +61,7 @@ public class BlockParser {
                 StringBuilder inner = new StringBuilder();
                 inner.append(c);
                 //if we're not the first open, go into a sub-parser
-                int currentlyOpen = 1;//the one we just saw is one-open
+                int currentlyOpen = 2;//the one we just saw is one-open
 
                 for (int j = i + 1; j < contents.length; j++) {
                     char lookAhead = contents[j];
@@ -74,18 +74,17 @@ public class BlockParser {
                         LOGGER.fine("Saw open with inner: " + inner);
                     }
                     if (currentlyOpen == 0) {
-                        if (currentVariant == null || lookAhead == VARIANT_SEPARTOR) {
-                            LOGGER.fine("Entire sub-segment: " + inner);
-                            BlockParser sub = new BlockParser(current.toString() + inner.toString());
-                            if (currentVariant == null) {
-                                blocks.add(sub.parse());
-                            } else {
-                                currentVariant.variants.add(sub.parse());
-                            }
-                            current = new StringBuilder();
-                            i = j;
-                            break;
+                        String subSegment = current.toString() + inner.toString() + lookAhead;
+                        LOGGER.fine("Entire sub-segment: " + subSegment);
+                        BlockParser sub = new BlockParser(subSegment);
+                        if (currentVariant == null) {
+                            blocks.add(sub.parse());
+                        } else {
+                            currentVariant.variants.add(sub.parse());
                         }
+                        current = new StringBuilder();
+                        i = j;
+                        break;
                     }
                     inner.append(lookAhead);
                 }
@@ -99,9 +98,6 @@ public class BlockParser {
                 if (current.length() > 0) {
                     LOGGER.fine("Reached close block with content: " + current);
                     currentVariant.variants.add(new ConstantBlock(current.toString()));
-                } else {
-                    //special case: an empty block is printed as {} by echo, let's do the same
-                    blocks.add(new ConstantBlock(String.valueOf(OPEN) + String.valueOf(CLOSE)));
                 }
                 currentVariant = null;
                 current = new StringBuilder();
@@ -163,7 +159,7 @@ public class BlockParser {
         handler.setLevel(Level.FINER);
         LOGGER.addHandler(handler);
 
-        BlockParser parser = new BlockParser("{b,{a,b,c}}a");
+        BlockParser parser = new BlockParser("a{b,c{d,e,f}g,h}ij{k,l}");
         BlockList blocks = parser.parse();
 
         for (Block block : blocks.getBlocks()) {

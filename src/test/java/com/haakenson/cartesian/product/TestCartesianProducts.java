@@ -39,7 +39,6 @@ public class TestCartesianProducts {
         //from the output of echo
         assertEquals("abc", CartesianProduct.product("abc"));
         assertEquals("", CartesianProduct.product(""));
-        assertEquals("{}", CartesianProduct.product("{}"));
     }
 
     @Test
